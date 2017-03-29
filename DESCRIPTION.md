@@ -1,157 +1,53 @@
-Instagramライクなパン/ピンチ操作できるイメージビューの作成
+制約の修正なしで縦方向に要素を追加可能なビューの作成
 
 ## 概要
-Instagramアプリのようなパン/ピンチ操作を受け取り、拡大/移動ができるイメージビューを作成する方法です。
-サンプルでは、パン操作とピンチ操作を使用していますが、同じ方法で回転(Rotation gesture)することもできます。
+タイトルが長ったらしいですが、オートレイアウトでビューを組版している時、後から機能追加が発生し、「途中にビューを追加したい！」、「最後にビューを追加したい！」ってなると非常に面倒です。
+そこで、Scroll ViewとStack Viewを組み合わせることで、AndroidでいうLinearLayoutっぽいものを実現できます。
 
-![animation](https://github.com/ayakix/Scale-ImageView/raw/master/images/animation.gif)
+![image9](images/image9.png)
 
-## Interface Builder構築手順
-### 1.フィルタービューの追加
-イメージビューの下の階層に透明なビューを用意します。
-イメージビューが操作を受け取り拡大率に応じて、フィルタービューの背景色を濃くすることで画像を見やすくします。
+## 構築手順
+### 1.Scroll Viewの配置
+基盤となるViewの全画面にScroll Viewを配置します。
 
-![image1](https://github.com/ayakix/Scale-ImageView/raw/master/images/image1.png)
+![image1](images/image1.png)
 
-### 2.イメージビューの追加
-フィルタービューの上の階層にイメージビューを配置します。
-User Interaction EnabledとMultiple Touchにチェックをします。
+Add New Constraintsで上下左右全てのマージンを0とします。
 
-![image2](https://github.com/ayakix/Scale-ImageView/raw/master/images/image2.png)
+![image2](images/image2.png)
 
-### 3.パン/ピンチジェスチャーの追加
-Pan Gesture RecognizerおよびPinch Gesture Recognizerをイメージビューの上にドラッグ＆ドロップします。
-また、delegateおよびIBActionをViewControllerにセットします。
+### 2.Stack Viewの配置
+Scroll viewの子要素として、Vertical Stack Viewを配置します。
+手順1と同様に、Add New Constraintsで上下左右全てのマージンを0とします。
 
-![image3](https://github.com/ayakix/Scale-ImageView/raw/master/images/image3.png)
+![image3](images/image3.png)
 
-### 4.パンジェスチャーのプロパティ
-1本指では、パン操作を受け付けたくない場合には、Touchesを2に変更します。
+しかし、このままではScroll Viewのコンテントサイズの制約がないためエラーがでます。
+![image4](images/image4.png)
 
-![image4](https://github.com/ayakix/Scale-ImageView/raw/master/images/image4.png)
+### 3.Scroll Viewコンテンツサイズの横幅の制約
+Controlキーを押しながらStack Viewを選択し、Scroll Viewへドラッグします。
+![image5](images/image5.png)
 
-## プログラム説明
-### TransformProperty構造体
-イメージビューの変形状態を保持します。
+**Equla Widths** を選択し、Stack Viewの横幅をScroll Viewコンテントの横幅と揃える制約をつけます。
 
-```swift
-fileprivate struct TransformProperty {
-    private let kMaxBackgroundAlpha: CGFloat = 0.77
-    private let kMinBackgroundAlpha: CGFloat = 0.4
+![image6](images/image6.png)
 
-    var point: CGPoint
-    var scale: CGFloat
-    var backgroundAlpha: CGFloat {
-        didSet {
-            // Round the value
-            backgroundAlpha = min(kMaxBackgroundAlpha, max(kMinBackgroundAlpha, backgroundAlpha))
-        }
-    }
+### 4.Scroll Viewコンテンツサイズの高さ（=Stack Viewの高さ）の制約
+手順2により、Scroll Viewコンテンツサイズの高さ=Stack Viewの高さなため、Stack Viewの高さを決定します。様々なやり方があるのですが、ここでは、Stack Viewに配置されているビュー間のマージンが同じになるDistribution=Equal Spacingを例に取り説明します。
 
-    init() {
-        point = CGPoint(x: 0, y: 0)
-        scale = 1.0
-        backgroundAlpha = kMinBackgroundAlpha
-    }
-}
-```
+![image7](images/image7.png)
 
-### ViewControllerとIBAction
-onPinchGestureとonPanGestureで操作を受け取り、イメージビューを変形します。
+Stack Viewの子要素として適当なViewを追加します。
+このViewの高さに制約を設けます。
 
-```swift
-class ViewController: UIViewController {
-    @IBOutlet fileprivate weak var filterView: UIView!
-    @IBOutlet fileprivate weak var imageView: UIImageView!
+![image8](images/image8.png)
 
-    lazy fileprivate var transformProperty = TransformProperty()
+Viewの高さが決定できると、Stack Viewの高さが決定でき、Scroll Viewのコンテンツサイズの高さが決まるため、エラーがなくなります。
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
+以後、このStack Viewの子要素として、高さが決定しているViewを追加すれば、他のビューの制約を修正する必要はなくなります。
 
-        // Bring the expanded view to the forefront if needed
-//        self.view.bringSubview(toFront: imageView)
-    }
-
-    @IBAction private func onPinchGesture(_ sender: UIPinchGestureRecognizer) {
-        switch sender.state {
-        case .changed:
-            let scale = sender.scale
-            if scale <= 1 {
-                break
-            }
-            transformProperty.scale = (sender.scale - 1.0) * 0.5 + 1.0
-            transform()
-            // Darken the background color when scaled
-            transformProperty.backgroundAlpha = (sender.scale - 1.0) * 0.8
-            changeBaseViewBackgroundColor()
-        case .ended, .cancelled:
-            revertTransform()
-        default:
-            break
-        }
-    }
-
-    @IBAction private func onPanGesture(_ sender: UIPanGestureRecognizer) {
-        guard let view = sender.view else {
-            return
-        }
-        switch sender.state {
-        case .changed:
-            transformProperty.point = sender.translation(in: view)
-            transform()
-            changeBaseViewBackgroundColor()
-        case .ended, .cancelled:
-            revertTransform()
-        default:
-            break
-        }
-    }
-}
-```
-
-### イメージビューの変形
-transformPropertyの値に基づき、イメージビューを変形します。
-指が離れて、操作が終わった時には、アニメーションを使って、元の位置にイメージビューを戻します。
-
-```swift
-fileprivate extension ViewController {
-    func transform() {
-        imageView.transform = CGAffineTransform(translationX: transformProperty.point.x, y: transformProperty.point.y)
-            .scaledBy(x: transformProperty.scale, y: transformProperty.scale)
-    }
-
-    func revertTransform() {
-        transformProperty = TransformProperty()
-        UIView.animate(withDuration: 0.6, delay: 0.0, usingSpringWithDamping: 0.8, initialSpringVelocity: 1.0, options: .curveEaseOut, animations: { () -> Void in
-            self.imageView.transform = CGAffineTransform.identity
-            self.transform()
-            self.filterView.backgroundColor = UIColor.clear
-        }, completion: nil)
-    }
-
-    func changeBaseViewBackgroundColor() {
-        filterView.backgroundColor = UIColor(red: 0.0, green: 0.0, blue: 0.0, alpha: transformProperty.backgroundAlpha)
-    }
-}
-```
-
-### UIGestureRecognizerDelegateの実装
-trueを返すことにより、一つのジェスチャー中に他のジェスチャーも受け取ることができます。
-
-```swift
-extension ViewController: UIGestureRecognizerDelegate {
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        return true
-    }
-}
-```
-
+今回の例では、縦方向に要素を追加するサンプルについて説明しましたが、Horizontal Stack Viewを使えば同様の処理を横方向についても実現できます。
 
 ## サンプル
-[Scale-ImageView@github](https://github.com/ayakix/Scale-ImageView)に動作するプロジェクトがあります。
-
-
-## 動作確認
-このTipsは、「スマホの写真素材が売買できるサイト[Snapmart](https://snapmart.jp/)」を開発する中で生まれました。
-実際の動作を[Snapmartアプリ（iOS）](https://itunes.apple.com/jp/app/id1087206878)から確認できますので、是非ダウンロードしてみてください！
+[Scroll-Stack-Content@github](https://github.com/ayakix/Scroll-Stack-Content)に動作するプロジェクトがあります。

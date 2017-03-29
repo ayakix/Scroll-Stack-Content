@@ -1,4 +1,4 @@
-Scale ImageView like Instagram app
+Creating views that can add elements vertically without modification of constraints
 ===========
 
 [![Platform](http://img.shields.io/badge/platform-ios-blue.svg?style=flat
@@ -9,10 +9,9 @@ Scale ImageView like Instagram app
 )](http://mit-license.org)
 
 # Overview
-This is a sample program that creates a scale image view like Instagram app.
-This ImageView responds to pan and pinch gestures.
+This is a sample program that create views that can add elements vertically without modification of constraints on Interface Builder.
 
-![screen_shot](images/animation.gif)
+![image9](images/image9.png)
 
 ## Author
 
